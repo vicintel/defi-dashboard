@@ -1,0 +1,32 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background-color: #0a0a0f;
+  color: #e2e8f0;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+@layer utilities {
+  .glow-green {
+    box-shadow: 0 0 20px rgba(0, 245, 160, 0.15);
+  }
+  .glow-blue {
+    box-shadow: 0 0 20px rgba(0, 217, 245, 0.15);
+  }
+  .text-glow {
+    text-shadow: 0 0 12px rgba(0, 245, 160, 0.6);
+  }
+  .card-border {
+    border: 1px solid #1e1e2e;
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: #0a0a0f; }
+::-webkit-scrollbar-thumb { background: #1e1e2e; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #00f5a0; }
