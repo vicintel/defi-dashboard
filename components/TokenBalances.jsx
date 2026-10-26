@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import { ERC20_TOKENS, ERC20_ABI } from "@/lib/tokens";
+import { readProvider } from "@/lib/chain";
 
-const RPC = "https://eth.llamarpc.com";
+const usd = (n) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 async function getBalances(address) {
-  const provider = new ethers.JsonRpcProvider(RPC);
+  const provider = readProvider();
 
   // ETH balance
   const ethBal = await provider.getBalance(address);
@@ -16,6 +17,7 @@ async function getBalances(address) {
       symbol: "ETH",
       name: "Ethereum",
       color: "#627eea",
+      coingeckoId: "ethereum",
       balance: parseFloat(ethers.formatEther(ethBal)),
     },
   ];
@@ -39,7 +41,7 @@ async function getBalances(address) {
   return results;
 }
 
-function BalanceRow({ token }) {
+function BalanceRow({ token, price }) {
   return (
     <div className="flex items-center justify-between rounded-lg border border-border/50 bg-dark/50 px-4 py-3 transition hover:border-brand/20">
       <div className="flex items-center gap-3">
@@ -61,13 +63,15 @@ function BalanceRow({ token }) {
             maximumFractionDigits: 6,
           })}
         </p>
-        <p className="text-[10px] text-slate-500">{token.symbol}</p>
+        <p className="text-[10px] text-slate-500">
+          {price ? usd(token.balance * price) : token.symbol}
+        </p>
       </div>
     </div>
   );
 }
 
-export default function TokenBalances({ account }) {
+export default function TokenBalances({ address: account, prices }) {
   const [tokens, setTokens] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -76,21 +80,31 @@ export default function TokenBalances({ account }) {
     if (!account) return;
     setLoading(true);
     setError(null);
+    // Ignore a slow reply for an address we have since moved away from
+    let current = true;
     getBalances(account)
-      .then(setTokens)
-      .catch(() => setError("Failed to load balances"))
-      .finally(() => setLoading(false));
+      .then((t) => current && setTokens(t))
+      .catch(() => current && setError("Failed to load balances"))
+      .finally(() => current && setLoading(false));
+    return () => { current = false; };
   }, [account]);
 
   return (
     <section className="card-border rounded-xl bg-card p-5">
-      <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-400">
-        Token Balances
-      </h2>
+      <div className="mb-4 flex items-baseline justify-between">
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+          Token Balances
+        </h2>
+        {account && !loading && prices && tokens.length > 0 && (
+          <span className="text-sm font-semibold text-white">
+            {usd(tokens.reduce((sum, t) => sum + t.balance * (prices[t.coingeckoId]?.usd ?? 0), 0))}
+          </span>
+        )}
+      </div>
 
       {!account && (
         <div className="flex h-32 items-center justify-center text-sm text-slate-600">
-          Connect wallet to view balances
+          Connect a wallet or look up an address
         </div>
       )}
 
@@ -113,7 +127,7 @@ export default function TokenBalances({ account }) {
       {account && !loading && tokens.length > 0 && (
         <div className="space-y-2">
           {tokens.map((t) => (
-            <BalanceRow key={t.symbol} token={t} />
+            <BalanceRow key={t.symbol} token={t} price={prices?.[t.coingeckoId]?.usd} />
           ))}
         </div>
       )}

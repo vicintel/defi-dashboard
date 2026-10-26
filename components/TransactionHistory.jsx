@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ethers } from "ethers";
+import { fetchTransactions } from "@/lib/chain";
 
 function shortAddr(addr) {
   if (!addr) return "—";
@@ -63,7 +64,7 @@ function TxRow({ tx, account }) {
   );
 }
 
-export default function TransactionHistory({ account }) {
+export default function TransactionHistory({ address: account }) {
   const [txs, setTxs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -73,11 +74,13 @@ export default function TransactionHistory({ account }) {
     setLoading(true);
     setError(null);
 
-    fetch(`/api/transactions?address=${account}`)
-      .then((r) => r.json())
-      .then((d) => setTxs(d.transactions || []))
-      .catch(() => setError("Failed to load transactions"))
-      .finally(() => setLoading(false));
+    // Ignore a slow reply for an address we have since moved away from
+    let current = true;
+    fetchTransactions(account)
+      .then((t) => current && setTxs(t))
+      .catch(() => current && setError("Failed to load transactions"))
+      .finally(() => current && setLoading(false));
+    return () => { current = false; };
   }, [account]);
 
   return (
@@ -100,7 +103,7 @@ export default function TransactionHistory({ account }) {
 
       {!account && (
         <div className="flex h-40 items-center justify-center text-sm text-slate-600">
-          Connect wallet to view transactions
+          Connect a wallet or look up an address
         </div>
       )}
 

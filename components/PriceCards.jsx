@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { COINS } from "@/lib/coingecko";
 
 function fmt(n) {
   if (n >= 1e12) return `$${(n / 1e12).toFixed(2)}T`;
@@ -45,29 +45,15 @@ function PriceCard({ coin }) {
   );
 }
 
-export default function PriceCards() {
-  const [coins, setCoins] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [lastUpdated, setLastUpdated] = useState(null);
-
-  async function load() {
-    try {
-      const res = await fetch("/api/prices");
-      const data = await res.json();
-      setCoins(data);
-      setLastUpdated(new Date());
-    } catch {
-      // silently fail, keep stale data
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    load();
-    const id = setInterval(load, 60_000);
-    return () => clearInterval(id);
-  }, []);
+export default function PriceCards({ prices, updated }) {
+  const coins = prices
+    ? COINS.map((coin) => ({
+        ...coin,
+        price: prices[coin.id]?.usd ?? 0,
+        change24h: prices[coin.id]?.usd_24h_change ?? 0,
+        marketCap: prices[coin.id]?.usd_market_cap ?? 0,
+      }))
+    : [];
 
   return (
     <section>
@@ -75,14 +61,14 @@ export default function PriceCards() {
         <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-400">
           Live Prices
         </h2>
-        {lastUpdated && (
+        {updated && (
           <span className="text-[10px] text-slate-600">
-            Updated {lastUpdated.toLocaleTimeString()}
+            Updated {updated.toLocaleTimeString()}
           </span>
         )}
       </div>
 
-      {loading ? (
+      {!prices ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="h-24 animate-pulse rounded-xl bg-card card-border" />

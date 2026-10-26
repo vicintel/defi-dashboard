@@ -1,63 +1,50 @@
 # DeFi Dashboard
 
-A wallet-connected dashboard for tracking Ethereum balances, live token prices, and
-transaction history. Connect MetaMask, and it reads your ERC-20 balances straight from
-the chain and pairs them with live market data.
+A read-only Ethereum dashboard: live token prices, a wallet's balances priced in dollars, and its recent transactions. Connect MetaMask, or look up any address or ENS name without a wallet.
 
-Built with Next.js 14 (App Router), ethers v6, and Tailwind CSS.
+**Live:** https://vicintel.github.io/defi-dashboard/ (try the `vitalik.eth` sample)
+
+![The dashboard showing vitalik.eth](docs/screenshot.jpg)
+
+Built with Next.js 14 (App Router, static export), ethers v6 and Tailwind CSS.
 
 ## What it does
 
-- **Wallet connect** — MetaMask via `ethers.BrowserProvider`, with network detection and
-  a truncated address display. No wallet, no data: nothing is stored server-side.
-- **Live prices** — ETH, BTC, BNB, SOL, USDC and USDT with 24h change and market cap,
-  from CoinGecko.
-- **Token balances** — ERC-20 balances read directly from mainnet contracts (USDT, USDC,
-  DAI and others), priced against the live feed.
-- **Transaction history** — the 20 most recent transactions for the connected address,
-  with gas cost and success/failure status.
+- **Wallet connect or lookup.** MetaMask through `ethers.BrowserProvider`, or type any `0x` address or `.eth` name. ENS names resolve on mainnet.
+- **Live prices.** ETH, BTC, BNB, SOL, USDC and USDT with 24h change and market cap from CoinGecko, refreshed every minute.
+- **Token balances.** ETH and ERC-20 balances (USDT, USDC, DAI, WBTC, LINK) read straight from the mainnet contracts, each priced in dollars, with a total.
+- **Transaction history.** The 20 most recent transactions, in or out, with failures marked and links to Etherscan.
 
 ## How it's put together
 
-Third-party APIs are called from route handlers, never from the browser, so API keys stay
-on the server and responses can be cached:
+It runs entirely in the browser, so it can be hosted as static files with no server and no API keys:
 
 ```
-app/api/prices/route.js         → CoinGecko, revalidated every 60s
-app/api/transactions/route.js   → Etherscan,  revalidated every 30s
+lib/coingecko.js   prices from CoinGecko's public API
+lib/chain.js       balanceOf and ENS reads through a public RPC node (PublicNode),
+                   transaction history from Blockscout's Etherscan-compatible API
+app/page.js        one price feed shared by the price cards and the balance totals
+components/        Navbar, AddressLookup, PriceCards, TokenBalances, TransactionHistory
 ```
 
-Chain reads (`balanceOf` on each token contract) happen client-side through the user's own
-wallet provider, so there's no RPC key to manage and no node to pay for.
-
-```
-app/          App Router pages and API route handlers
-components/   Navbar, PriceCards, TokenBalances, TransactionHistory
-lib/          Token contract definitions and the CoinGecko client
-```
+Each panel drops a reply that arrives for an address you've already moved away from, so switching quickly between wallets never shows the wrong one's data.
 
 ## Running it locally
 
 ```bash
 npm install
-cp .env.example .env.local   # add your Etherscan key
 npm run dev
 ```
 
-| Variable | Required | Notes |
-| --- | --- | --- |
-| `ETHERSCAN_API_KEY` | for transaction history | Free tier is enough. Prices and balances work without it. |
+Open http://localhost:3000. No environment variables are needed.
 
-Then open http://localhost:3000 with MetaMask installed.
+To build the copy that runs on GitHub Pages:
+
+```bash
+PAGES_BASE_PATH=/defi-dashboard npm run build   # static site in out/
+```
 
 ## Notes
 
-- Read-only. The app never requests a signature, never submits a transaction, and never
-  touches your private keys.
+- Read-only. It never asks for a signature, never sends a transaction and never touches private keys.
 - Ethereum mainnet only.
-- Built as a portfolio project to work through wallet connection, on-chain reads, and
-  server-side API caching in the App Router.
-
-## License
-
-MIT

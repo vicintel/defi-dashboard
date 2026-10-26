@@ -1,27 +1,52 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { ethers } from "ethers";
 import Navbar from "@/components/Navbar";
+import AddressLookup from "@/components/AddressLookup";
 import PriceCards from "@/components/PriceCards";
 import TokenBalances from "@/components/TokenBalances";
 import TransactionHistory from "@/components/TransactionHistory";
+import { COINS, fetchPrices } from "@/lib/coingecko";
+import { ERC20_TOKENS } from "@/lib/tokens";
+
+const PRICE_IDS = [...new Set([...COINS.map((c) => c.id), ...ERC20_TOKENS.map((t) => t.coingeckoId)])];
 
 export default function Home() {
   const [account, setAccount] = useState(null);
   const [network, setNetwork] = useState(null);
+  // The address being shown: the connected wallet, or one looked up by hand
+  const [viewing, setViewing] = useState(null);
+  const [prices, setPrices] = useState(null);
+  const [pricesUpdated, setPricesUpdated] = useState(null);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        setPrices(await fetchPrices(PRICE_IDS));
+        setPricesUpdated(new Date());
+      } catch {
+        // keep the last prices we had
+      }
+    }
+    load();
+    const id = setInterval(load, 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   const connectWallet = useCallback(async () => {
     if (typeof window === "undefined" || !window.ethereum) {
-      alert("MetaMask not detected. Please install MetaMask.");
+      alert("MetaMask not detected. Install MetaMask, or look up an address instead.");
       return;
     }
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
       const accounts = await provider.send("eth_requestAccounts", []);
       const net = await provider.getNetwork();
-      setAccount(accounts[0]);
-      setNetwork(net.name === "homestead" ? "Ethereum" : net.name);
+      const address = ethers.getAddress(accounts[0]);
+      setAccount(address);
+      setViewing(address);
+      setNetwork(net.name === "mainnet" || net.name === "homestead" ? "Ethereum" : net.name);
     } catch (err) {
       console.error("Connect failed:", err);
     }
@@ -30,6 +55,7 @@ export default function Home() {
   const disconnectWallet = useCallback(() => {
     setAccount(null);
     setNetwork(null);
+    setViewing(null);
   }, []);
 
   return (
@@ -41,34 +67,37 @@ export default function Home() {
         network={network}
       />
 
-      <main className="mx-auto max-w-7xl px-6 py-8 space-y-8">
+      <main className="mx-auto max-w-7xl px-4 py-8 space-y-8 sm:px-6">
         {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold text-white">
-            DeFi{" "}
-            <span className="text-brand text-glow">Dashboard</span>
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Connect your wallet to view balances, prices, and transaction history.
-          </p>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-white">
+              DeFi{" "}
+              <span className="text-brand text-glow">Dashboard</span>
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Connect a wallet, or look up any Ethereum address, to see its balances and history.
+            </p>
+          </div>
+          <AddressLookup onLookup={setViewing} current={account ? null : viewing} />
         </div>
 
         {/* Live Prices */}
-        <PriceCards />
+        <PriceCards prices={prices} updated={pricesUpdated} />
 
         {/* Wallet sections */}
         <div className="grid gap-6 lg:grid-cols-2">
-          <TokenBalances account={account} />
-          <TransactionHistory account={account} />
+          <TokenBalances address={viewing} prices={prices} />
+          <TransactionHistory address={viewing} />
         </div>
 
         {/* Stats bar */}
-        {account && (
+        {viewing && (
           <div className="card-border rounded-xl bg-card px-6 py-4">
             <div className="flex flex-wrap gap-8">
-              <Stat label="Connected Address" value={`${account.slice(0, 10)}...${account.slice(-6)}`} />
-              <Stat label="Network" value={network || "—"} />
-              <Stat label="Status" value="Live" highlight />
+              <Stat label={account ? "Connected address" : "Viewing address"} value={`${viewing.slice(0, 10)}...${viewing.slice(-6)}`} />
+              <Stat label="Network" value={network || "Ethereum"} />
+              <Stat label="Mode" value={account ? "Wallet" : "Read-only"} highlight />
             </div>
           </div>
         )}
@@ -77,10 +106,10 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t border-border py-6 text-center text-[11px] text-slate-700">
         Built by{" "}
-        <a href="https://victor-dusky.vercel.app" className="text-brand/60 hover:text-brand transition">
+        <a href="https://myportfolio-one-eta-18.vercel.app" className="text-brand/60 hover:text-brand transition">
           Victor Dickson
         </a>{" "}
-        · Powered by CoinGecko + Etherscan
+        · Prices from CoinGecko · History from Blockscout · Read-only, never asks for a signature
       </footer>
     </div>
   );
